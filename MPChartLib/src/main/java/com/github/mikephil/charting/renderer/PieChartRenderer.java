@@ -122,31 +122,18 @@ public class PieChartRenderer extends DataRenderer {
     @Override
     public void drawData(Canvas c) {
 
-        int width = (int) mViewPortHandler.getChartWidth();
-        int height = (int) mViewPortHandler.getChartHeight();
+        Bitmap drawBitmap = getStrongDrawBitmap();
+        if (drawBitmap != null) {
 
-        Bitmap drawBitmap = mDrawBitmap == null ? null : mDrawBitmap.get();
+            drawBitmap.eraseColor(Color.TRANSPARENT);
 
-        if (drawBitmap == null
-                || (drawBitmap.getWidth() != width)
-                || (drawBitmap.getHeight() != height)) {
+            PieData pieData = mChart.getData();
 
-            if (width > 0 && height > 0) {
-                drawBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_4444);
-                mDrawBitmap = new WeakReference<>(drawBitmap);
-                mBitmapCanvas = new Canvas(drawBitmap);
-            } else
-                return;
-        }
+            for (IPieDataSet set : pieData.getDataSets()) {
 
-        drawBitmap.eraseColor(Color.TRANSPARENT);
-
-        PieData pieData = mChart.getData();
-
-        for (IPieDataSet set : pieData.getDataSets()) {
-
-            if (set.isVisible() && set.getEntryCount() > 0)
-                drawDataSet(c, set);
+                if (set.isVisible() && set.getEntryCount() > 0)
+                    drawDataSet(c, set);
+            }
         }
     }
 
@@ -665,9 +652,13 @@ public class PieChartRenderer extends DataRenderer {
 
     @Override
     public void drawExtras(Canvas c) {
-        drawHole(c);
-        c.drawBitmap(mDrawBitmap.get(), 0, 0, null);
-        drawCenterText(c);
+        Bitmap drawBitmap = getStrongDrawBitmap();
+        if (drawBitmap != null) {
+            // drawCircles(c);
+            drawHole(c);
+            c.drawBitmap(drawBitmap, 0, 0, null);
+            drawCenterText(c);
+        }
     }
 
     private Path mHoleCirclePath = new Path();
@@ -678,7 +669,7 @@ public class PieChartRenderer extends DataRenderer {
      */
     protected void drawHole(Canvas c) {
 
-        if (mChart.isDrawHoleEnabled() && mBitmapCanvas != null) {
+        if (getStrongDrawBitmap() != null && mChart.isDrawHoleEnabled() && mBitmapCanvas != null) {
 
             float radius = mChart.getRadius();
             float holeRadius = radius * (mChart.getHoleRadius() / 100);
@@ -982,7 +973,10 @@ public class PieChartRenderer extends DataRenderer {
 
             mPathBuffer.close();
 
-            mBitmapCanvas.drawPath(mPathBuffer, mRenderPaint);
+            // ensure existence of mBitmapCanvas
+            if (getStrongDrawBitmap() != null) {
+                mBitmapCanvas.drawPath(mPathBuffer, mRenderPaint);
+            }
         }
 
         MPPointF.recycleInstance(center);
@@ -1032,7 +1026,9 @@ public class PieChartRenderer extends DataRenderer {
                         * phaseY)) + center.y);
 
                 mRenderPaint.setColor(dataSet.getColor(j));
-                mBitmapCanvas.drawCircle(x, y, circleRadius, mRenderPaint);
+                if (getStrongDrawBitmap() != null) { // ensure existence of mBitmapCanvas
+                    mBitmapCanvas.drawCircle(x, y, circleRadius, mRenderPaint);
+                }
             }
 
             angle += sliceAngle * phaseX;
@@ -1056,5 +1052,30 @@ public class PieChartRenderer extends DataRenderer {
             mDrawBitmap.clear();
             mDrawBitmap = null;
         }
+    }
+
+    /**
+     * Get a strong reference to mDrawBitmap.
+     * This will ensure existence of mBitmapCanvas, too.
+     * Result may be null, if no such reference is available.
+     */
+    private Bitmap getStrongDrawBitmap() {
+        int width = (int) mViewPortHandler.getChartWidth();
+        int height = (int) mViewPortHandler.getChartHeight();
+
+        Bitmap drawBitmap = mDrawBitmap == null ? null : mDrawBitmap.get();
+
+        if (drawBitmap == null
+                || (drawBitmap.getWidth() != width)
+                || (drawBitmap.getHeight() != height)) {
+
+            if (width > 0 && height > 0) {
+                drawBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_4444);
+                mDrawBitmap = new WeakReference<>(drawBitmap);
+                mBitmapCanvas = new Canvas(drawBitmap);
+            }
+        }
+
+        return drawBitmap;
     }
 }
